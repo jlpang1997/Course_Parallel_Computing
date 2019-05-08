@@ -29,5 +29,8 @@
     <ClInclude Include="lab1_OpenMP.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="lab2_MPI.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
