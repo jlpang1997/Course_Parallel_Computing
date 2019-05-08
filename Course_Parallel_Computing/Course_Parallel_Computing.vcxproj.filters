@@ -18,5 +18,13 @@
     <ClCompile Include="Course_Parallel_Computing.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="lab1_OpenMP.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="lab1_OpenMP.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

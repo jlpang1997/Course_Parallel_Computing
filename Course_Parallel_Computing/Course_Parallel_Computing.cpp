@@ -1,9 +1,165 @@
-ï»¿
 #include <iostream>
+#include"lab1_OpenMP.h"
+#include<omp.h>
+#define N 30
+#include<time.h>
+void part_sort(int a[], int begin, int end)//begin end ·Ö±ğÊÇ×îĞ¡×î´óÏÂ±ê ÓÃ×î¼òµ¥µÄÑ¡ÔñÅÅĞò
+{
+	for (int i = begin; i <= end; i++)
+	{
+		int k = i;
+		for (int j = i+1; j <= end; j++)
+		{
+			if (a[j] < a[k])
+			{
+				k = j;
+			}
+		}
+		if (k != i)
+		{
+			int tmp = a[i];
+			a[i] = a[k];
+			a[k] =tmp;
+		}
 
+	}
+}
+using namespace std;
 int main()
 {
-    std::cout << "Hello World!\n"; 
+
+	//PiComputing_Parallel_Region();
+	//PiComputing_Parallel_ShareTask();
+
+	//PiComputing_Parallel_Private_Critial();
+	//PiComputing_Parallel_Reduction();
+	int array[N] = { 15,46,48,93,39,6,72,91,14,
+				36,69,40,89,61,97,12,21,54,
+				53,97,84,58,32,27,33,72,20 },
+		array_tmp[N];
+	for(int i=0;i<N;i++)
+	{
+		array[i] = rand() % 1000000;
+		//printf("%d ", array[i]);
+	}
+	cout << endl;
+
+
+	int main_elem[NUM_THREADS - 1];//ÕâÀï¾Í¹æ¶¨ÁË£¬ÖÁÉÙÒªÁ½¸öÏß³Ì£¬Í¬Ê±£¬Òª´ÓÃ¿¸ö×ÓÊı×éÖĞÑ¡È¡Ïß³ÌÊı¸öÔªËØ£¬ËùÒÔÏß³ÌÊıµÄÆ½·½ÒªĞ¡ÓÚN
+	int partition[NUM_THREADS][NUM_THREADS];//¼ÇÂ¼Ã¿¶ÎÔªËØ¸öÊı
+	int part_len = N / NUM_THREADS;
+	//int index[NUM_THREADS+1];
+
+	int a[NUM_THREADS*NUM_THREADS];
+	//index[0] = 0;
+	//index[NUM_THREADS] = N;
+
+	omp_set_num_threads(NUM_THREADS);
+#pragma omp parallel
+	{
+		//¾Ö²¿ÅÅĞò
+		int id = omp_get_thread_num();
+		int tmp = (id == NUM_THREADS - 1) ? N : (id + 1)*part_len;
+		part_sort(array, id*part_len, tmp - 1);
+
+#pragma omp barrier
+		//Ñ¡È¡Ñù±¾
+		int step = part_len / NUM_THREADS;
+		for (int j = 0; j < part_len; j+=step)
+		{
+			a[id*NUM_THREADS+ j/step] = array[id*part_len+j];
+		}
+#pragma omp barrier
+		//Ñù±¾ÅÅĞò,Ö»¸ø0Ïß³Ì¸É
+		if(id==0)
+			part_sort(a, 0, NUM_THREADS*NUM_THREADS-1);
+#pragma omp barrier
+
+		//Ñ¡È¡Ö÷Ôª
+		if(id<NUM_THREADS-1)
+			main_elem[id] = a[NUM_THREADS*(id+1)];//×îºóÒ»¸öÏß³Ì²»ÓÃ¹¤×÷
+#pragma omp barrier
+		//Ö÷Ôª»®·Ö
+		int start = id * part_len;
+		for (int j = 0; j < NUM_THREADS; j++)
+		{
+			int tmp = (id == NUM_THREADS - 1) ? N : (id + 1)*part_len;
+			if (j == NUM_THREADS - 1)
+			{
+				partition[id][j] = tmp - start;
+			}
+			else
+			{
+				int i;
+				for (i = start; i < tmp&&array[i] <= main_elem[j]; i++);
+				partition[id][j] = i - start;
+				start = i;
+			}
+		}
+#pragma omp barrier
+		//È«¾Ö½»»»
+		for (int j = 0; j < NUM_THREADS; j++)
+		{
+			int start_index_tmp = 0;//ÕÒµ½ÁÙÊ±Êı×éµÄÆğµã
+			for (int k = 0; k < j; k++)
+			{
+				for(int b=0;b<NUM_THREADS;b++)
+				{
+					start_index_tmp += partition[b][k];
+				}
+			}
+			for (int b = 0; b < id; b++)
+			{
+				start_index_tmp += partition[b][j];
+			}
+			int start_index_init = 0;//ÕÒµ½Ô­À´Êı×éµØÆğµã
+			for (int m = 0; m < j; m++)
+			{
+				start_index_init += partition[id][m];
+			}
+			int len = partition[id][j];//»ñµÃÒª½»»»µÄ×Ó×ÓÊı×éµÄ´óĞ¡
+			for (int i = start_index_tmp, k = start_index_init, n = 0; n < len; i++, k++, n++)
+			{
+				array_tmp[i] = array[id*part_len + k];
+			}
+		}
+
+//#pragma omp barrier//×¨ÃÅÓÃÒ»¸ö´¦ÀíÆ÷À´ÕÒµ½ĞÂµÄ·Ö¶Î
+//
+//		if (id == 0)
+//		{
+//			index[0] = 0;
+//			for (int j = 1; j < NUM_THREADS; j++)
+//			{
+//				int tmp = 0;
+//				for (int idi = 0; idi < NUM_THREADS; idi++)
+//				{
+//					tmp += partition[idi][j - 1];
+//				}
+//				index[j] = tmp + index[j - 1];
+//			}
+//		}
+#pragma omp barrier
+		//¹é²¢ÅÅĞò
+		int starti=0, endi=0;
+		for (int j=0; j < id; j++)
+		{
+			for (int idi = 0; idi < NUM_THREADS; idi++)
+			{
+				starti += partition[idi][j];
+			}
+		}
+		endi = starti;
+		for (int idi = 0; idi < NUM_THREADS; idi++)
+		{
+			endi += partition[idi][id];
+		}
+			part_sort(array_tmp,starti,endi- 1);
+	}
+	for (int i = 0; i < N; i++)
+	{
+		cout << array_tmp[i] << " ";
+	}
+	cout << endl;
+	return 0;
 }
-
-
