@@ -21,6 +21,9 @@
     <ClCompile Include="lab1_OpenMP.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="lab2_MPI.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="lab1_OpenMP.h">
