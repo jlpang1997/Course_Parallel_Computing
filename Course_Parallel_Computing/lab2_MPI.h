@@ -1,2 +1,5 @@
 #pragma once
-int main_lab2(int argc, char *argv[]);
+
+void PiComputing_MPI(int argc, char *argv[]);
+
+void main_lab2(int argc, char *argv[]);
