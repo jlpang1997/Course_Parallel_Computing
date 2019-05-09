@@ -73,50 +73,27 @@ void PSRS_MPI(int argc, char *argv[], int array[], int n)
 		}
 		cout << endl;
 	}
-	//局部排序
-	MPI_Barrier(MPI_COMM_WORLD);
+	//局部排序,然后每一个线程都把负责排序好的那部分广播给主线程，最终的结果是array_tmp有完整的局部排序数组。
 	int tmp = (id == thread_num - 1) ? n : (id + 1)*part_len;
 	Quick_Sort(array, id*part_len, tmp - 1);
-	//part_sort(array, id*part_len, tmp - 1);
-
-
 	MPI_Barrier(MPI_COMM_WORLD);
-	//array_tmp作为部分排序之后的数组，然后交给0号处理器采样、样本排序、选取主元
-
+	//如果出现数组元素个数和线程数不能整除的情况，会导致划分不均匀，所以无法直接用gather，而是要算出元素个数和偏移量，用gatherv
 	int *revccount = (int *)malloc(sizeof(int)*thread_num);
 	int *displs = (int *)malloc(sizeof(int)*thread_num);
 	for (int i = 0; i < thread_num; i++)
 	{
-		revccount[i]= (i == thread_num - 1) ? (n - i * part_len) : part_len;
+		revccount[i]= (i == thread_num - 1) ? (n - i * part_len) : part_len;//线程负责元素个数
 	};
 	displs[0] = 0;
 	for (int i = 1; i < thread_num; i++)
 	{
-		displs[i] = displs[i - 1] + revccount[i - 1];
+		displs[i] = displs[i - 1] + revccount[i - 1];//偏移量计算
 	}
-	//最后一段不均分，所以用gatherv
+	//都发回给主线程
 	MPI_Gatherv(&array[id*part_len], revccount[id], MPI_INT, array_tmp, revccount, displs,MPI_INT, 0, MPI_COMM_WORLD);
-
-	//if (id == 0)
-	//{
-	//	cout << "局部排序后聚合" << endl;
-	//	for (int i = 0; i < n; i++)
-	//	{
-
-	//		printf("%d %s", array_tmp[i], (i > 0 && (i + 1) % (part_len) == 0 && i < part_len*(thread_num - 1)) ? "\n" : " ");
-	//	}
-	//	cout << endl;
-	//	
-	//}
-	
 	free(revccount);
 	free(displs);
-	
-	MPI_Barrier(MPI_COMM_WORLD);
-	if (!main_elem)
-	{
-		cout << "error" << endl;
-	}
+	//主线程采样、样本排序、选取主元，最后把主元和array广播给其他线程
 	if (id == 0)
 	{
 		for (int i = 0; i < n; i++)
@@ -138,11 +115,9 @@ void PSRS_MPI(int argc, char *argv[], int array[], int n)
 	}
 	MPI_Bcast(&array[0],NMAX, MPI_INT, 0, MPI_COMM_WORLD);
 	MPI_Bcast(main_elem, thread_num - 1, MPI_INT, 0, MPI_COMM_WORLD);
-
-
 	MPI_Barrier(MPI_COMM_WORLD);
 
-	//主元划分
+	//主元划分,partition存的是每一个子数组划分出的子子数组的大小
 	int* partition = (int *)malloc(sizeof(int)*thread_num);
 	int start = id * part_len;
 	for (int j = 0; j < thread_num; j++)
@@ -160,48 +135,32 @@ void PSRS_MPI(int argc, char *argv[], int array[], int n)
 			start = i;
 		}
 	}
-	
 	MPI_Barrier(MPI_COMM_WORLD);
-	int* partition_gather=(int *)malloc(sizeof(int)*thread_num*thread_num);//妈的，一开始就应该用动态分配的
-	if (!partition_gather)
-	{
-		printf("error\n");
-		exit(0);
-	}
+	//最后把每个划分gather到每个线程的partition_gather中
+	int* partition_gather=(int *)malloc(sizeof(int)*thread_num*thread_num);
 	MPI_Allgather(partition, thread_num, MPI_INT, partition_gather, thread_num, MPI_INT, MPI_COMM_WORLD);
-
 	MPI_Barrier(MPI_COMM_WORLD);
+
 	//全局交换
-	
 	for (int j = 0; j < thread_num; j++)
 	{
 		int start_index_tmp = 0;//找到临时数组的起点
 		for (int k = 0; k < j; k++)
-		{
 			for (int b = 0; b < thread_num; b++)
-			{
-				//start_index_tmp += partition[b][k];
 				start_index_tmp += partition_gather[b*thread_num+k];
-			}
-		}
 		for (int b = 0; b < id; b++)
-		{
-			//start_index_tmp += partition[b][j];
 			start_index_tmp += partition_gather[b*thread_num + j];
-		}
 		int start_index_init = 0;//找到原来数组地起点
 		for (int m = 0; m < j; m++)
-		{
-			/*start_index_init += partition[id][m];*/
 			start_index_init += partition_gather[id*thread_num + m];
-		}
-		/*int len = partition[id][j];*///获得要交换的子子数组的大小
 		int len = partition_gather[id*thread_num + j];
+
 		for (int i = start_index_tmp, k = start_index_init, n = 0; n < len; i++, k++, n++)
 		{
-			array_tmp[i] = array[id*part_len + k];
+			array_tmp[i] = array[id*part_len + k];//先把线程内部的array_tmp组装好
 		}
-		for (int idi = 1; idi < thread_num; idi++)
+		//由于对于每个线程来说，都是把原来负责的子数组划分出n部分，然后填到新数组里，而且这n部分还是不连续的，没有想出诸如gather和bcast的方法，只能一块一块发送个主线程，然后组装了。
+		for (int idi = 1; idi < thread_num; idi++)//非主线程发送给主线程
 		{
 			Meg megsend;
 			if (id == idi)
@@ -211,7 +170,7 @@ void PSRS_MPI(int argc, char *argv[], int array[], int n)
 				MPI_Send(&array_tmp[start_index_tmp], len, MPI_INT, 0, 1, MPI_COMM_WORLD);
 			}
 		}
-		if (id == 0)
+		if (id == 0)//主线程接收其他线程发来的array_tmp并组装
 		{
 			for (int idi = 1; idi < thread_num; idi++)
 			{
@@ -222,7 +181,7 @@ void PSRS_MPI(int argc, char *argv[], int array[], int n)
 			}
 		}
 	}
-	MPI_Bcast(array_tmp, n, MPI_INT, 0, MPI_COMM_WORLD);
+	MPI_Bcast(array_tmp, n, MPI_INT, 0, MPI_COMM_WORLD);//最后主线程广播给其他线程，保证每个线程的array_tmp保持一致。
 
 	MPI_Barrier(MPI_COMM_WORLD);
 	//归并排序
@@ -241,8 +200,9 @@ void PSRS_MPI(int argc, char *argv[], int array[], int n)
 		/*endi += partition[idi][id];*/
 		endi += partition_gather[idi*thread_num + id];
 	}
-	Quick_Sort(array_tmp, starti, endi - 1);
+	Quick_Sort(array_tmp, starti, endi - 1);//先内部排序
 
+	//下面处理同上，都是通过gatherv把每块排好的放到主线程中的array
 	int subcount = endi - starti;
 	int* count = (int *)malloc(sizeof(int)*thread_num);
 	int *disp = (int *)malloc(sizeof(int)*thread_num);
