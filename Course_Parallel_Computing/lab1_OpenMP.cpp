@@ -130,7 +130,7 @@ void part_sort(int a[], int begin, int end)//begin end 分别是最小最大下标 用最简
 
 	}
 }
-void PSRS(int array[], int n, int thread_num)//n为数组实际容量
+void PSRS_OpenMP(int array[], int n, int thread_num)//n为数组实际容量
 {
 	if (thread_num*thread_num >= n||thread_num<=1||thread_num>THREAD_NUM_MAX||n>NMAX)
 	{
@@ -138,7 +138,6 @@ void PSRS(int array[], int n, int thread_num)//n为数组实际容量
 		exit(0);
 	}
 	int array_tmp[NMAX];
-
 	int main_elem[THREAD_NUM_MAX - 1];//这里就规定了，至少要两个线程，同时，要从每个子数组中选取线程数个元素，所以线程数的平方要小于NMAX
 	int partition[THREAD_NUM_MAX][THREAD_NUM_MAX];//记录每段元素个数
 	int part_len = n / thread_num;
@@ -155,7 +154,7 @@ void PSRS(int array[], int n, int thread_num)//n为数组实际容量
 		int tmp = (id == thread_num - 1) ? n : (id + 1)*part_len;
 		part_sort(array, id*part_len, tmp - 1);
 
-#pragma omp barrier
+//#pragma omp barrier
 		//选取样本
 		int step = part_len / thread_num;
 		for (int j = 0; j < part_len; j += step)
@@ -270,13 +269,13 @@ void main_lab1()
 	//PiComputing_Parallel_Private_Critial();
 	//PiComputing_Parallel_Reduction();
 	int array[NMAX];
-	for (int i = 0; i < NMAX; i++)
+	for (int i = 0; i < 20; i++)
 	{
 		array[i] = rand() % 1000000;
 	}
 
-	PSRS(array, NMAX, 3);
-	for (int i = 0; i < NMAX; i++)
+	PSRS_OpenMP(array, 20, 3);
+	for (int i = 0; i < 20; i++)
 		cout << array[i] << endl;
 
 }
