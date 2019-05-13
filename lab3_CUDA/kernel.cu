@@ -40,41 +40,18 @@ __global__ void matAddKernel(Matrix *A, Matrix *B, Matrix *C)
 // 矩阵相乘kernel，2-D，每个线程计算一个元素
 __global__ void matMulKernel(Matrix *A, Matrix *B, Matrix *C)
 {
-
 	int Cvalue = 0;
 	int row = threadIdx.y + blockIdx.y * blockDim.y;//获取该线程所处理的矩阵行号
 	int col = threadIdx.x + blockIdx.x * blockDim.x;//获取该线程所处理的矩阵列号
 
-	//col = 0;
-	//printf("(%d , %d)\n", row, col);
-	for (int i = 0; i < A->height; i++)
-	{
-		for (int j = 0; j < A->width; j++)
-		{
-			printf("%d ", A->elements[i*A->width + j]);
-		}
-		printf("\n");
-	}
-	for (int i = 0; i < B->height; i++)
-	{
-		for (int j = 0; j < B->width; j++)
-		{
-			printf("%d ", B->elements[i*A->width + j]);
-		}
-		printf("\n");
-	}
 	for (int i = 0; i < A->width; ++i)//普通的矩阵乘法
 	{
 		int a, b, c;
-		//a = getElement(A, row, i);
 		a = A->elements[row*A->width + i];
 		b = B->elements[i*B->width + col];
-		//b = getElement(B, i, col);
 		c = a * b;
 		Cvalue +=c;
-		printf("%d * %d = %d \n", a,b,c);
 	}
-	//printf("\n");
 	setElement(C, row, col, Cvalue);//把结果写回到C矩阵
 }
 //using namespace std;
@@ -83,17 +60,17 @@ int main()
 	int width = 1 << 2;
 	int height = 1 << 2;
 	Matrix *A, *B, *C, *D;
-	// 申请托管内存
+	
 
+	int height_A = 16;
 	int width_A = 4;
-	int height_A = 4;
 	int height_B = width_A;
-	int width_B = 1;
+	int width_B = 4;
 
 	int width_result = width_B;
 	int height_result = height_A;
 
-
+	// 申请托管内存  不用ppt上的拷来拷去的做法 这相当于是共享内存了吧
 	cudaMallocManaged((void**)&A, sizeof(Matrix));
 	cudaMallocManaged((void**)&B, sizeof(Matrix));
 	cudaMallocManaged((void**)&C, sizeof(Matrix));
@@ -117,29 +94,18 @@ int main()
 	{
 		for (int j = 0; j < width_A; j++)
 		{
-			A->elements[i*height_A + j]=rand()%10;
+			A->elements[i*width_A + j]=rand()%10;
 		}
 	}
 	for (int i = 0; i < height_B; i++)
 	{
 		for (int j = 0; j < width_B; j++)
 		{
-			B->elements[i*height_B + j]=rand()%10;
+			B->elements[i*width_B + j]=rand()%10;
 		}
 	}
-
-	//dim3 blockSize(1, 2);
-	//dim3 gridSize((width + blockSize.x - 1) / blockSize.x,
-	//	(height + blockSize.y - 1) / blockSize.y);
-	////std::cout << (width + blockSize.x - 1) / blockSize.x << std::endl;
-	//// 执行kernel
-	//matMulKernel <<< gridSize, blockSize >>> (A, B, C);
-	 //同步device 保证结果能正确访问
-
-
-	dim3 blockSize(1, 2);
-	dim3 gridSize((width_result + blockSize.x - 1) / blockSize.x,
-		(height_result + blockSize.y - 1) / blockSize.y);
+	dim3 blockSize(2,2);
+	dim3 gridSize(width_B/blockSize.x,height_A/blockSize.y);
 	// 执行kernel
 	matMulKernel <<< gridSize, blockSize >>> (A, B, C);
 	 //同步device 保证结果能正确访问
@@ -153,7 +119,7 @@ int main()
 	{
 		for (int j = 0; j < width_A; j++)
 		{
-			printf("%3d ", A->elements[i*height_A + j]);
+			printf("%3d ", A->elements[i*width_A + j]);
 		}
 		std::cout << std::endl;
 	}
@@ -162,16 +128,16 @@ int main()
 	{
 		for (int j = 0; j < width_B; j++)
 		{
-			printf("%3d ", B->elements[i*height_B + j]);
+			printf("%3d ", B->elements[i*width_B + j]);
 		}
 		std::cout << std::endl;
 	}
-	std::cout << "A*B:" << std::endl;
-	for (int i = 0; i < height_result; ++i)
+	std::cout << "\n\n\nA*B:" << std::endl;
+	for (int i = 0; i < height_result; i++)
 	{
 		for (int j = 0; j < width_result; j++)
 		{
-			printf("%3d ", C->elements[i*height_result + j]);
+			printf("%10d ", C->elements[i*width_result + j]);
 		}
 		std::cout << std::endl;
 	}
@@ -179,3 +145,12 @@ int main()
 
 	return 0;
 }
+
+/*
+	1,学会用Nsight调试
+	2，学会一些基本的cuda函数
+	3，完成实验2
+
+
+
+*/
