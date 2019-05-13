@@ -90,9 +90,10 @@ void PSRS_MPI(int argc, char *argv[], int array[], int n)
 		displs[i] = displs[i - 1] + revccount[i - 1];//偏移量计算
 	}
 	//都发回给主线程
-	MPI_Gatherv(&array[id*part_len], revccount[id], MPI_INT, array_tmp, revccount, displs,MPI_INT, 0, MPI_COMM_WORLD);
+	MPI_Gatherv(&array[id*part_len], revccount[id], MPI_INT, array_tmp, revccount, displs,MPI_INT,0, MPI_COMM_WORLD);
 	free(revccount);
 	free(displs);
+
 	//主线程采样、样本排序、选取主元，最后把主元和array广播给其他线程
 	if (id == 0)
 	{
@@ -267,7 +268,7 @@ void Quick_Sort(int a[], int starti, int endi)
 void main_lab2(int argc,char *argv[])
 {
 	//PiComputing_MPI( argc, argv);
-	int n = 30;
+	int n = 20;
 	int array[NMAX];
 	//	= {
 	//	15,46,48,93,39,6,72,91,14,
@@ -281,5 +282,6 @@ void main_lab2(int argc,char *argv[])
 	}
 	
 	PSRS_MPI(argc,argv,array, n);
+
 	
 }

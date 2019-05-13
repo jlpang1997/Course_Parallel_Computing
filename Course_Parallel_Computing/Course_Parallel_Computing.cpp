@@ -4,8 +4,8 @@
 using namespace std;
 int main(int argc,char *argv[])
 {
-	//main_lab1();
-	main_lab2(argc,argv);
+	main_lab1();
+	//main_lab2(argc,argv);
 	return 0;
 }
 
